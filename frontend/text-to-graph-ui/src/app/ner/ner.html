@@ -1,0 +1,97 @@
+<div class="page">
+
+  <mat-card class="input-card">
+
+    <div class="input-header">
+      <p>Paste text or upload a file to generate relationships and nodes!</p>
+    </div>
+
+    <div class="input-row">
+
+      <mat-form-field appearance="outline" class="text-field">
+        <mat-label>Paste your text here</mat-label>
+        <textarea matInput rows="6" [(ngModel)]="text"></textarea>
+      </mat-form-field>
+
+      <div class="input-side">
+        <label class="file-upload">
+          <input type="file" (change)="onFileSelected($event)" hidden />
+          <span>Select File</span>
+        </label>
+
+        <div *ngIf="selectedFile" class="file-name">
+          Selected file:  {{ selectedFile.name }}
+          <span class="remove-file" (click)="selectedFile = null">✖</span>
+        </div>
+
+        <div class="buttons">
+          <button mat-raised-button style="background-color: #715A5A; font-size: 18px"
+                  class="extract-btn"
+                  (click)="handleExtract()"
+                  [disabled]="loading || (!text.trim() && !selectedFile)">
+            {{
+              loading ? 'Processing…' :
+                selectedFile ? 'Extract File' :
+                  text.trim() ? 'Extract Text' :
+                    'Extract'
+            }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </mat-card>
+
+  <div class="documents-list">
+    <div *ngFor="let doc of documents; trackBy: trackById">
+      <mat-card class="doc-card">
+
+        <div class="doc-header">
+          <h3 class="doc-title">{{ doc.filename }}</h3>
+          <span class="date">{{ doc.created_at | date:'dd/MM/yyyy, HH:mm' }}</span>
+        </div>
+
+        <div class="status-row">
+        <span class="status-pill translating" *ngIf="doc.status === 'TRANSLATING'">
+          TRANSLATING
+        </span>
+          <span class="status-pill ner" *ngIf="doc.status === 'NER'">
+          NER
+        </span>
+          <span class="status-pill done" *ngIf="doc.status === 'DONE'">
+          DONE
+        </span>
+        </div>
+
+        <div class="doc-actions">
+          <a
+            *ngIf="doc.translated_pdf"
+            [href]="'http://localhost:8001/download/' + doc.translated_pdf"
+            target="_blank"
+            class="action-link"
+          >
+            <button mat-button class="doc-action-btn">
+              Download PDF
+            </button>
+          </a>
+
+          <button
+            mat-button
+            class="doc-action-btn"
+            *ngIf="doc.status === 'DONE'"
+            (click)="loadGraph(doc.id)"
+          >
+            Load Graph
+          </button>
+
+          <button
+            mat-button
+            class="doc-action-btn delete-btn"
+            (click)="deleteDoc(doc.id)"
+          >
+            Delete
+          </button>
+        </div>
+      </mat-card>
+    </div>
+  </div>
+</div>

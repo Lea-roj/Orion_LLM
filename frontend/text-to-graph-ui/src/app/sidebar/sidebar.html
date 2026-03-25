@@ -1,0 +1,21 @@
+<div class="sidebar">
+
+  <h2>TEXT TO GRAPH USING NAMED ENTITY RECOGNITION</h2>
+  <hr />
+
+  <h3>ORION PROJECT</h3>
+
+  <p class="menu-item"
+     [class.active]="activeView === 'ner'"
+     (click)="selectView('ner')">
+    NER
+  </p>
+
+  <p class="menu-item"
+     [class.active]="activeView === 'visualization'"
+     (click)="selectView('visualization')">
+    VISUALIZATION
+  </p>
+
+  <hr />
+</div>

@@ -1,0 +1,7 @@
+transformers
+torch
+python-docx
+reportlab
+tqdm
+sentencepiece
+sacremoses

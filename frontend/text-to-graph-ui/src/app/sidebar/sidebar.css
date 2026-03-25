@@ -1,0 +1,29 @@
+.sidebar {
+  width: 250px;
+  background: #37353E;
+  color: #D3DAD9;
+  padding: 20px;
+  height: 100%;
+  font-size: 16px
+}
+
+h1, h2, h3 {
+  letter-spacing: 2px;
+  line-height: 1.2;
+}
+
+.menu-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin: 5px 0;
+  transition: 0.2s;
+}
+
+.menu-item:hover {
+  background: #2a2f2f;
+}
+
+.menu-item.active {
+  background: #715A5A;
+}
