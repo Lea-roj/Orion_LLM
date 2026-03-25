@@ -1,0 +1,16 @@
+html, body {
+  height: 100%;
+  background: #44444E;
+  color: #D3DAD9;
+  margin: 0;
+}
+
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+}
+
+app-root {
+  display: block;
+  height: 100%;
+}

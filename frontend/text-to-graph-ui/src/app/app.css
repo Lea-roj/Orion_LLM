@@ -1,0 +1,11 @@
+.layout {
+  display: flex;
+  height: 100%;
+}
+
+.main-content {
+  flex: 1;
+  padding: 20px;
+  overflow: hidden;
+  box-sizing: border-box;
+}

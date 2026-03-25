@@ -1,0 +1,10 @@
+<div class="layout">
+  <app-sidebar [documents]="documents" [activeView]="currentView"
+               (documentSelected)="loadDocument($event)" (viewChanged)="currentView = $event">
+  </app-sidebar>
+
+  <div class="main-content">
+    <app-ner *ngIf="currentView === 'ner'" (graphLoaded)="onGraphLoaded($event)"></app-ner>
+    <app-graph *ngIf="currentView === 'visualization'" [graphData]="graph"></app-graph>
+  </div>
+</div>
