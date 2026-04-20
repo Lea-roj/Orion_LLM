@@ -1,7 +1,7 @@
 from pathlib import Path
 
+from backend.translate.ollama_service import ollama_extract_kg
 from translate import read_docx, translate_long_text, save_pdf
-from ner import rebel_on_long_text
 import time
 
 INPUT_FOLDER = "documents"
@@ -34,7 +34,7 @@ def process_file(file_path):
     print(f"Saved PDF: {output_path}")
     t0 = time.time()
 
-    kb = rebel_on_long_text(translated_text)
+    kb = ollama_extract_kg(translated_text)
 
     print(f"NER + REBEL: {time.time() - t0:.2f}s")
 

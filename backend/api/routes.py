@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from backend.api.schemas import ExtractGraphRequest, GraphResponse, NodeResponse, EdgeResponse
-from backend.translate.ner import rebel_on_long_text
+from backend.translate.ollama_service import ollama_extract_kg, KB
 from backend.translate.translate import translate_long_text, read_docx
 from fastapi import UploadFile, File
 import tempfile
@@ -20,29 +20,65 @@ from langdetect import detect
 router = APIRouter()
 os.makedirs("translated_pdf", exist_ok=True)
 
+from concurrent.futures import ThreadPoolExecutor
+
+def split_text(text, max_chars=1500):
+    return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
+
+
+def extract_kg_parallel(text):
+    chunks = split_text(text)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(ollama_extract_kg, chunks))
+
+    all_entities = []
+    all_relations = []
+
+    for kb_chunk in results:
+        all_entities.extend(kb_chunk.entities)
+        all_relations.extend(kb_chunk.relations)
+
+    return KB(all_entities, all_relations)
+
+
+import hashlib
+
+def stable_id(name):
+    return hashlib.md5(name.encode()).hexdigest()[:8]
+
+
 @router.post("/extract-graph", response_model=GraphResponse)
 def extract_graph(request: ExtractGraphRequest):
     translated = translate_long_text(request.text)
-    kb = rebel_on_long_text(translated)
 
-    nodes = []
-    edges = []
+    kb = extract_kg_parallel(translated)
 
-    for entity in kb.entities:
-        nodes.append(NodeResponse(
-            id=entity,
-            label=entity,
-            type=None,
-            source="rebel"
-        ))
+    nodes = [
+        NodeResponse(
+            id=f"{e['id']}_{stable_id(e['name'])}",
+            label=e["name"],
+            type=e.get("type"),
+            source="ollama"
+        )
+        for e in kb.entities
+    ]
 
-    for rel in kb.relations:
-        edges.append(EdgeResponse(
-            head=rel["head"],
-            tail=rel["tail"],
-            type=rel["type"],
-            confidence=1.0
-        ))
+    name_to_id = {
+        e["name"]: f"{e['id']}_{stable_id(e['name'])}"
+        for e in kb.entities
+    }
+
+    edges = [
+        {
+            "head": name_to_id.get(r["source"]),
+            "tail": name_to_id.get(r["target"]),
+            "type": r["relation"],
+            "confidence": 1.0
+        }
+        for r in kb.relations
+        if r["source"] in name_to_id and r["target"] in name_to_id
+    ]
 
     return GraphResponse(nodes=nodes, edges=edges)
 
@@ -140,26 +176,32 @@ def process_file_job(doc_id, tmp_path, suffix):
     doc.status = "NER"
     db.commit()
 
-    kb = rebel_on_long_text(translated)
+    kb = extract_kg_parallel(translated)
 
     nodes = [
         {
-            "id": e,
-            "label": e,
-            "type": None,
-            "source": "rebel"
+            "id": f"{e['id']}_{stable_id(e['name'])}",
+            "label": e["name"],
+            "type": e.get("type"),
+            "source": "ollama"
         }
         for e in kb.entities
     ]
 
+    name_to_id = {
+        e["name"]: f"{e['id']}_{stable_id(e['name'])}"
+        for e in kb.entities
+    }
+
     edges = [
         {
-            "head": r["head"],
-            "tail": r["tail"],
-            "type": r["type"],
+            "head": name_to_id.get(r["source"]),
+            "tail": name_to_id.get(r["target"]),
+            "type": r["relation"],
             "confidence": 1.0
         }
         for r in kb.relations
+        if r["source"] in name_to_id and r["target"] in name_to_id
     ]
 
     doc.graph_json = json.dumps({
@@ -240,34 +282,39 @@ def process_text_job(doc_id, text):
     doc.status = "NER"
     db.commit()
 
-    kb = rebel_on_long_text(translated)
+    kb = extract_kg_parallel(translated)
 
     nodes = [
         {
-            "id": e,
-            "label": e,
-            "type": None,
-            "source": "rebel"
+            "id": f"{e['id']}_{stable_id(e['name'])}",
+            "label": e["name"],
+            "type": e.get("type"),
+            "source": "ollama"
         }
         for e in kb.entities
     ]
 
+    name_to_id = {
+        e["name"]: f"{e['id']}_{stable_id(e['name'])}"
+        for e in kb.entities
+    }
+
     edges = [
         {
-            "head": r["head"],
-            "tail": r["tail"],
-            "type": r["type"],
+            "head": name_to_id.get(r["source"]),
+            "tail": name_to_id.get(r["target"]),
+            "type": r["relation"],
             "confidence": 1.0
         }
         for r in kb.relations
+        if r["source"] in name_to_id and r["target"] in name_to_id
     ]
 
     doc.graph_json = json.dumps({
         "nodes": nodes,
         "edges": edges,
-        "filename": "pasted_text",
-        "translated_pdf": pdf_name,
-        "created_at": doc.created_at.isoformat()
+        "filename": doc.filename,
+        "translated_pdf": pdf_name
     })
 
     doc.status = "DONE"
