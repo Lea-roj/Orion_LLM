@@ -51,21 +51,35 @@
         </div>
 
         <div class="status-row">
-        <span class="status-pill translating" *ngIf="doc.status === 'TRANSLATING'">
-          TRANSLATING
-        </span>
+          <span class="status-pill translating" *ngIf="doc.status === 'TRANSLATING'">
+            TRANSLATING
+          </span>
           <span class="status-pill ner" *ngIf="doc.status === 'NER'">
-          NER
-        </span>
+            NER
+          </span>
           <span class="status-pill done" *ngIf="doc.status === 'DONE'">
-          DONE
-        </span>
+            DONE
+          </span>
+            <span class="status-pill failed" *ngIf="doc.status === 'FAILED'">
+              FAILED
+            </span>
+        </div>
+
+        <div *ngIf="doc.status === 'NER'" class="progress-container">
+          <mat-progress-bar
+            mode="determinate"
+            [value]="doc.total_chunks ? (doc.processed_chunks / doc.total_chunks) * 100 : 0">
+          </mat-progress-bar>
+
+          <div class="progress-text">
+            {{ doc.processed_chunks }} / {{ doc.total_chunks }} processed segments
+          </div>
         </div>
 
         <div class="doc-actions">
           <a
             *ngIf="doc.translated_pdf"
-            [href]="'http://localhost:8001/download/' + doc.translated_pdf"
+            [href]="'http://localhost:8000/download/' + doc.translated_pdf"
             target="_blank"
             class="action-link"
           >
@@ -75,12 +89,12 @@
           </a>
 
           <button
+            *ngIf="(doc.processed_chunks > 0 || doc.status === 'DONE') && doc.status !== 'FAILED'"
             mat-button
             class="doc-action-btn"
-            *ngIf="doc.status === 'DONE'"
             (click)="loadGraph(doc.id)"
           >
-            Load Graph
+            {{ doc.status === 'DONE' ? 'Load Graph' : 'View Partial Graph' }}
           </button>
 
           <button

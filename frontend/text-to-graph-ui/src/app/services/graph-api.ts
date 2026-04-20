@@ -22,7 +22,7 @@ export interface GraphResponse {
 })
 export class GraphApiService {
 
-  private readonly API_URL = 'http://localhost:8001/extract-graph';
+  private readonly API_URL = 'http://localhost:8000/extract-graph';
 
   constructor(private http: HttpClient) {}
 
@@ -31,26 +31,26 @@ export class GraphApiService {
   }
 
   getStatus(id: number) {
-    return this.http.get(`http://localhost:8001/documents/${id}/status`);
+    return this.http.get(`http://localhost:8000/documents/${id}/status`);
   }
 
   uploadFile(formData: FormData) {
-    return this.http.post('http://localhost:8001/extract-graph-from-file', formData);
+    return this.http.post('http://localhost:8000/extract-graph-from-file', formData);
   }
 
   getDocuments(): Observable<any[]> {
-    return this.http.get<any[]>('http://localhost:8001/documents');
+    return this.http.get<any[]>('http://localhost:8000/documents');
   }
 
   getDocument(id: number) {
-    return this.http.get(`http://localhost:8001/documents/${id}`);
+    return this.http.get(`http://localhost:8000/documents/${id}`);
   }
 
   extractText(body: any) {
-    return this.http.post('http://localhost:8001/extract-graph-from-text', body);
+    return this.http.post('http://localhost:8000/extract-graph-from-text', body);
   }
 
   deleteDocument(id: number) {
-    return this.http.delete(`http://localhost:8001/documents/${id}`);
+    return this.http.delete(`http://localhost:8000/documents/${id}`);
   }
 }

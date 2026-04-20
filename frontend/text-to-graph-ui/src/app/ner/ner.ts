@@ -11,6 +11,7 @@ import { MatInputModule } from '@angular/material/input';
 import {MatToolbarModule} from '@angular/material/toolbar';
 import {MatIconModule} from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import {MatProgressBar} from '@angular/material/progress-bar';
 
 @Component({
   selector: 'app-ner',
@@ -27,7 +28,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     MatInputModule,
     MatToolbarModule,
     MatIconModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatProgressBar
   ],
   templateUrl: './ner.html',
   styleUrls: ['./ner.css']
@@ -40,6 +42,7 @@ export class NerComponent implements OnInit {
   fileName = '';
   documents: any[] = [];
   status: 'idle' | 'translating' | 'learning' | 'done' = 'idle';
+  activeGraphDocId: number | null = null;
 
   constructor(private api: GraphApiService) {}
 
@@ -126,34 +129,39 @@ export class NerComponent implements OnInit {
   }
 
   pollStatus(id: number) {
-    let lastStatus = '';
-
     const interval = setInterval(() => {
       this.api.getStatus(id).subscribe((res: any) => {
 
         const doc = this.documents.find(d => d.id === id);
 
-        if (res.status !== lastStatus) {
-          lastStatus = res.status;
+        if (doc) {
+          doc.status = res.status;
+          doc.processed_chunks = res.processed_chunks;
+          doc.total_chunks = res.total_chunks;
 
-          if (doc) {
-            doc.status = res.status;
-
-            if (res.translated_pdf) {
-              doc.translated_pdf = res.translated_pdf;
-            }
+          if (res.translated_pdf) {
+            doc.translated_pdf = res.translated_pdf;
           }
+        }
+
+        if (res.graph && this.activeGraphDocId === id) {
+          this.graph = res.graph;
+          this.graphLoaded.emit(res.graph);
         }
 
         if (res.status === 'DONE') {
           clearInterval(interval);
         }
+
       });
-    }, 1000);
+    }, 1500);
   }
 
   loadGraph(id: number) {
+    this.activeGraphDocId = id;
+
     this.api.getDocument(id).subscribe((res: any) => {
+      this.graph = res;
       this.graphLoaded.emit(res);
     });
   }

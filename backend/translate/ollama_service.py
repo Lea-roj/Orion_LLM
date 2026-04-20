@@ -21,7 +21,10 @@ def call_ollama(prompt, retries=3):
                 json={
                     "model": MODEL,
                     "prompt": prompt,
-                    "stream": False
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1
+                    }
                 },
                 timeout=120
             )
@@ -32,9 +35,22 @@ def call_ollama(prompt, retries=3):
     raise Exception("Ollama failed after retries")
 
 
-def ollama_extract_kg(text):
+def ollama_extract_kg(text, context=None):
+    context_block = ""
+
+    if context:
+        context_block = f"""
+Previously identified entities (use these for consistency, reuse names if possible):
+{", ".join(context[:50])}
+"""
+
     prompt = f"""
 Extract entities and relationships from the text.
+
+IMPORTANT:
+- Reuse existing entity names if they appear again
+- Avoid duplicates (e.g. "EU" vs "European Union")
+- Keep entity names consistent
 
 Return ONLY valid JSON in this format:
 
@@ -46,6 +62,8 @@ Return ONLY valid JSON in this format:
     {{"source": "Murko Darjan", "target": "Somalia", "relation": "BORN_IN", "context": "Born February 11, 1999"}}
   ]
 }}
+
+{context_block}
 
 Text:
 {text}

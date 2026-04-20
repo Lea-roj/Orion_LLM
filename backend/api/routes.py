@@ -20,27 +20,17 @@ from langdetect import detect
 router = APIRouter()
 os.makedirs("translated_pdf", exist_ok=True)
 
-from concurrent.futures import ThreadPoolExecutor
+def split_text(text, max_chars=2000, overlap=400):
+    chunks = []
+    i = 0
 
-def split_text(text, max_chars=1500):
-    return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
+    while i < len(text):
+        chunk = text[i:i + max_chars]
+        chunks.append(chunk)
 
+        i += max_chars - overlap
 
-def extract_kg_parallel(text):
-    chunks = split_text(text)
-
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        results = list(executor.map(ollama_extract_kg, chunks))
-
-    all_entities = []
-    all_relations = []
-
-    for kb_chunk in results:
-        all_entities.extend(kb_chunk.entities)
-        all_relations.extend(kb_chunk.relations)
-
-    return KB(all_entities, all_relations)
-
+    return chunks
 
 import hashlib
 
@@ -48,11 +38,47 @@ def stable_id(name):
     return hashlib.md5(name.encode()).hexdigest()[:8]
 
 
+def relation_key(r):
+    return (
+        r["source"].lower().strip(),
+        r["target"].lower().strip(),
+        r["relation"].lower().strip()
+    )
+
+
 @router.post("/extract-graph", response_model=GraphResponse)
 def extract_graph(request: ExtractGraphRequest):
     translated = translate_long_text(request.text)
 
-    kb = extract_kg_parallel(translated)
+    chunks = split_text(translated, max_chars=2000)
+
+    entity_map = {}
+    relations = []
+    relation_set = set()
+
+    for chunk in chunks:
+        if not chunk.strip():
+            continue
+
+        context_entities = list(entity_map.keys())[-50:]
+
+        kb_chunk = ollama_extract_kg(
+            chunk,
+            context=context_entities
+        )
+
+        for e in kb_chunk.entities:
+            key = e["name"].lower().strip()
+            if key not in entity_map:
+                entity_map[key] = e
+
+        for r in kb_chunk.relations:
+            key = relation_key(r)
+            if key not in relation_set:
+                relation_set.add(key)
+                relations.append(r)
+
+    kb = KB(list(entity_map.values()), relations)
 
     nodes = [
         NodeResponse(
@@ -65,19 +91,19 @@ def extract_graph(request: ExtractGraphRequest):
     ]
 
     name_to_id = {
-        e["name"]: f"{e['id']}_{stable_id(e['name'])}"
+        e["name"].lower().strip(): f"{e['id']}_{stable_id(e['name'])}"
         for e in kb.entities
     }
 
     edges = [
         {
-            "head": name_to_id.get(r["source"]),
-            "tail": name_to_id.get(r["target"]),
+            "head": name_to_id.get(r["source"].lower().strip()),
+            "tail": name_to_id.get(r["target"].lower().strip()),
             "type": r["relation"],
             "confidence": 1.0
         }
         for r in kb.relations
-        if r["source"] in name_to_id and r["target"] in name_to_id
+        if r["source"].lower().strip() in name_to_id and r["target"].lower().strip() in name_to_id
     ]
 
     return GraphResponse(nodes=nodes, edges=edges)
@@ -173,47 +199,9 @@ def process_file_job(doc_id, tmp_path, suffix):
     save_pdf(translated.split("\n"), pdf_path)
 
     doc.translated_pdf = pdf_name
-    doc.status = "NER"
     db.commit()
 
-    kb = extract_kg_parallel(translated)
-
-    nodes = [
-        {
-            "id": f"{e['id']}_{stable_id(e['name'])}",
-            "label": e["name"],
-            "type": e.get("type"),
-            "source": "ollama"
-        }
-        for e in kb.entities
-    ]
-
-    name_to_id = {
-        e["name"]: f"{e['id']}_{stable_id(e['name'])}"
-        for e in kb.entities
-    }
-
-    edges = [
-        {
-            "head": name_to_id.get(r["source"]),
-            "tail": name_to_id.get(r["target"]),
-            "type": r["relation"],
-            "confidence": 1.0
-        }
-        for r in kb.relations
-        if r["source"] in name_to_id and r["target"] in name_to_id
-    ]
-
-    doc.graph_json = json.dumps({
-        "nodes": nodes,
-        "edges": edges,
-        "filename": doc.filename,
-        "translated_pdf": pdf_name
-    })
-
-    doc.status = "DONE"
-    db.commit()
-
+    process_chunks_and_build_graph(doc, translated, pdf_name, db)
     db.close()
     os.remove(tmp_path)
 
@@ -229,7 +217,10 @@ def get_status(doc_id: int):
 
     return {
         "status": doc.status,
-        "translated_pdf": doc.translated_pdf
+        "translated_pdf": doc.translated_pdf,
+        "processed_chunks": doc.processed_chunks,
+        "total_chunks": doc.total_chunks,
+        "graph": json.loads(doc.graph_json) if doc.graph_json else None
     }
 
 @router.post("/extract-graph-from-text")
@@ -268,10 +259,7 @@ def process_text_job(doc_id, text):
     except:
         lang = "unknown"
 
-    if lang == "sl":
-        translated = translate_long_text(text)
-    else:
-        translated = text
+    translated = translate_long_text(text) if lang == "sl" else text
 
     pdf_name = f"translation_{uuid.uuid4().hex}.pdf"
     pdf_path = f"translated_pdf/{pdf_name}"
@@ -279,46 +267,9 @@ def process_text_job(doc_id, text):
     save_pdf(translated.split("\n"), pdf_path)
 
     doc.translated_pdf = pdf_name
-    doc.status = "NER"
     db.commit()
 
-    kb = extract_kg_parallel(translated)
-
-    nodes = [
-        {
-            "id": f"{e['id']}_{stable_id(e['name'])}",
-            "label": e["name"],
-            "type": e.get("type"),
-            "source": "ollama"
-        }
-        for e in kb.entities
-    ]
-
-    name_to_id = {
-        e["name"]: f"{e['id']}_{stable_id(e['name'])}"
-        for e in kb.entities
-    }
-
-    edges = [
-        {
-            "head": name_to_id.get(r["source"]),
-            "tail": name_to_id.get(r["target"]),
-            "type": r["relation"],
-            "confidence": 1.0
-        }
-        for r in kb.relations
-        if r["source"] in name_to_id and r["target"] in name_to_id
-    ]
-
-    doc.graph_json = json.dumps({
-        "nodes": nodes,
-        "edges": edges,
-        "filename": doc.filename,
-        "translated_pdf": pdf_name
-    })
-
-    doc.status = "DONE"
-    db.commit()
+    process_chunks_and_build_graph(doc, translated, pdf_name, db)
     db.close()
 
 
@@ -341,3 +292,96 @@ def delete_document(doc_id: int):
     db.close()
 
     return {"message": "Deleted"}
+
+
+def process_chunks_and_build_graph(doc, translated, pdf_name, db):
+    try:
+        chunks = split_text(translated, max_chars=2000)
+
+        doc.total_chunks = len(chunks)
+        doc.processed_chunks = 0
+        doc.status = "NER"
+        db.commit()
+
+        entity_map = {}
+        relations = []
+        relation_set = set()
+
+        for i, chunk in enumerate(chunks, start=1):
+
+            doc.processed_chunks = i - 1
+            db.commit()
+
+            if not chunk.strip():
+                continue
+
+            context_entities = list(entity_map.keys())[-50:]
+
+            kb_chunk = ollama_extract_kg(
+                chunk,
+                context=context_entities
+            )
+
+            # merge entities
+            for e in kb_chunk.entities:
+                key = e["name"].lower().strip()
+                if key not in entity_map:
+                    entity_map[key] = e
+
+            # merge relations
+            for r in kb_chunk.relations:
+                key = relation_key(r)
+                if key not in relation_set:
+                    relation_set.add(key)
+                    relations.append(r)
+
+            # update progress
+            doc.processed_chunks = i
+            db.commit()
+
+            update_graph(doc, entity_map, relations, pdf_name, db)
+
+        doc.status = "DONE"
+        db.commit()
+    except Exception as e:
+        doc.status = "FAILED"
+        db.commit()
+        print("ERROR:", e)
+
+
+def update_graph(doc, entity_map, relations, pdf_name, db):
+    nodes = [
+        {
+            "id": f"{e['id']}_{stable_id(e['name'])}",
+            "label": e["name"],
+            "type": e.get("type"),
+            "source": "ollama"
+        }
+        for e in entity_map.values()
+    ]
+
+    name_to_id = {
+        e["name"].lower().strip(): f"{e['id']}_{stable_id(e['name'])}"
+        for e in entity_map.values()
+    }
+
+    edges = [
+        {
+            "head": name_to_id.get(r["source"].lower().strip()),
+            "tail": name_to_id.get(r["target"].lower().strip()),
+            "type": r["relation"],
+            "confidence": 1.0
+        }
+        for r in relations
+        if r["source"].lower().strip() in name_to_id
+        and r["target"].lower().strip() in name_to_id
+    ]
+
+    doc.graph_json = json.dumps({
+        "nodes": nodes,
+        "edges": edges,
+        "filename": doc.filename,
+        "translated_pdf": pdf_name
+    })
+
+    db.commit()

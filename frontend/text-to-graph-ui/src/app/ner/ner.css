@@ -217,3 +217,23 @@ button {
   background: #715A5A !important;
   color: #D3DAD9 !important;
 }
+
+.progress-container {
+  margin-top: 8px;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+.status-pill.failed {
+  background-color: rgba(255, 77, 79, 0.15);
+  color: #ff4d4f;
+  border-radius: 12px;
+  border: 1px solid #ff4d4f;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}

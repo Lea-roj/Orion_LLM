@@ -29,6 +29,15 @@ export class GraphComponent implements OnChanges {
     }
   }
 
+  getColor(type: string) {
+    switch (type) {
+      case 'PERSON': return '#4A90E2';
+      case 'LOC': return '#50E3C2';
+      case 'ORG': return '#F5A623';
+      default: return '#715a5a';
+    }
+  }
+
   render() {
     const nodes = this.graphData.nodes.map((n: any) => ({
       id: n.id,
@@ -36,7 +45,7 @@ export class GraphComponent implements OnChanges {
       shape: 'dot',
       size: 20,
       color: {
-        background: '#715a5a',
+        background: this.getColor(n.type),
         border: '#D3DAD9'
       },
       font: {
