@@ -4,8 +4,9 @@ import re
 import time
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "glm-5:cloud"   # or "llama3"
-
+MODEL = "llama3"
+# https://github.com/ollama/ollama/blob/86b0dd4b165497e08ec331e3c2c2aa229beb09db/docs/faq.md#how-can-i-expose-ollama-on-my-network
+# https://github.com/ollama/ollama/issues/1579
 
 class KB:
     def __init__(self, entities, relations):
