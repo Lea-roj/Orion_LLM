@@ -8,12 +8,14 @@ import {
 } from '@angular/core';
 
 import { Network } from 'vis-network/standalone';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-graph',
   standalone: true,
   templateUrl: './graph.html',
-  styleUrls: ['./graph.css']
+  styleUrls: ['./graph.css'],
+  imports: [CommonModule]
 })
 export class GraphComponent implements OnChanges {
 
@@ -22,6 +24,7 @@ export class GraphComponent implements OnChanges {
   container!: ElementRef<HTMLDivElement>;
 
   network?: Network;
+  selectedNode: any = null;
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['graphData'] && this.graphData) {
@@ -84,5 +87,17 @@ export class GraphComponent implements OnChanges {
       data,
       options
     );
+
+    this.network.on('click', (params: any) => {
+      if (params.nodes.length > 0) {
+        const nodeId = params.nodes[0];
+
+        this.selectedNode = this.graphData.nodes.find(
+          (n: any) => n.id === nodeId
+        );
+      } else {
+        this.selectedNode = null;
+      }
+    });
   }
 }

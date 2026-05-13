@@ -1,1 +1,29 @@
-<div #graphContainer class="graph-container"></div>
+<div class="graph-layout">
+  <div #graphContainer class="graph-container"></div>
+
+  <div class="node-panel">
+    <ng-container *ngIf="selectedNode; else emptyPanel">
+      <h3>{{ selectedNode.label }}</h3>
+
+      <p>
+        <strong>Type:</strong> {{ selectedNode.type }}
+      </p>
+
+      <h4>Occurrences in text</h4>
+
+      <div class="mention" *ngFor="let mention of selectedNode.mentions">
+        <div class="line-number">
+          Line {{ mention.line }}
+        </div>
+
+        <div class="mention-text">
+          {{ mention.text }}
+        </div>
+      </div>
+    </ng-container>
+
+    <ng-template #emptyPanel>
+      <p class="empty-panel">Click a node to see details.</p>
+    </ng-template>
+  </div>
+</div>
