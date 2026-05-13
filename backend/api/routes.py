@@ -85,7 +85,8 @@ def extract_graph(request: ExtractGraphRequest):
             id=f"{e['id']}_{stable_id(e['name'])}",
             label=e["name"],
             type=e.get("type"),
-            source="ollama"
+            source="ollama",
+            mentions=find_mentions(translated, e["name"])
         )
         for e in kb.entities
     ]
@@ -339,7 +340,7 @@ def process_chunks_and_build_graph(doc, translated, pdf_name, db):
             doc.processed_chunks = i
             db.commit()
 
-            update_graph(doc, entity_map, relations, pdf_name, db)
+            update_graph(doc, entity_map, relations, pdf_name, db, translated)
 
         doc.status = "DONE"
         db.commit()
@@ -349,13 +350,14 @@ def process_chunks_and_build_graph(doc, translated, pdf_name, db):
         print("ERROR:", e)
 
 
-def update_graph(doc, entity_map, relations, pdf_name, db):
+def update_graph(doc, entity_map, relations, pdf_name, db, translated):
     nodes = [
         {
             "id": f"{e['id']}_{stable_id(e['name'])}",
             "label": e["name"],
             "type": e.get("type"),
-            "source": "ollama"
+            "source": "ollama",
+            "mentions": find_mentions(translated, e["name"])
         }
         for e in entity_map.values()
     ]
@@ -385,3 +387,19 @@ def update_graph(doc, entity_map, relations, pdf_name, db):
     })
 
     db.commit()
+
+
+def find_mentions(text: str, entity_name: str):
+    mentions = []
+    entity_lower = entity_name.lower()
+
+    lines = text.splitlines()
+
+    for line_number, line in enumerate(lines, start=1):
+        if entity_lower in line.lower():
+            mentions.append({
+                "line": line_number,
+                "text": line.strip()
+            })
+
+    return mentions

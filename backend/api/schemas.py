@@ -6,11 +6,17 @@ class ExtractGraphRequest(BaseModel):
     text: str
 
 
+class MentionResponse(BaseModel):
+    line: int
+    text: str
+
+
 class NodeResponse(BaseModel):
     id: str
     label: str
-    type: Optional[str]
-    source: str
+    type: Optional[str] = None
+    source: Optional[str] = None
+    mentions: List[MentionResponse] = []
 
 
 class EdgeResponse(BaseModel):
